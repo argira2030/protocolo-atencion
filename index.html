@@ -1,31 +1,44 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protocolo de Recuperación Atencional · Intervención Digital</title>
+
 <!--
   ==================================================
-  PROTOCOLO DE INTERVENCIÓN DIGITAL - v1.0
+  PROTOCOLO DE RECUPERACIÓN ATENCIONAL - v1.1 (ESPAÑOL)
   ==================================================
-  Título: Protocolo de Intervención Digital para la Recuperación de la Atención
+  Título: Protocolo de Recuperación Atencional: Intervención Digital Basada en Neurociencia
   Autor: Jose Ranero García
   ORCID: 0009-0009-3168-6379
   Copyright: © 2026 Jose Ranero García
   Licencia: Creative Commons Attribution 4.0 International (CC BY 4.0)
   DOI: 10.5281/zenodo.19554967
   Repositorio: https://argira.eus/protocolo-atencion/
-  Fase: Versión inicial (v1) - Sin persistencia de pasos/respuestas
-  =================================================
-  -->
-<meta name="citation_title" content="Protocolo de Intervención Digital para la Recuperación de la Atención">
+  Versión: v1.1 — Accesibilidad + lector de voz + persistencia localStorage
+  Cambios:
+    - ARIA roles/labels completos en todos los elementos interactivos
+    - Navegación por teclado (Enter/Espacio) en pasos y opciones
+    - Web Speech API botón "Escuchar" por sección (voz en español)
+    - Selector de idioma (ES ↔ EN) en la navegación
+    - localStorage: guarda pasos marcados + respuestas + días
+    - Barra de progreso con rAF throttling
+    - Enlace "Saltar al contenido"
+    - Estilos de foco visibles (focus-visible)
+    - Región live para lectores de pantalla
+  ==================================================
+-->
+
+<meta name="citation_title" content="Protocolo de Recuperación Atencional: Intervención Digital Basada en Neurociencia">
 <meta name="citation_author" content="Ranero García, Jose">
 <meta name="citation_author_orcid" content="0009-0009-3168-6379">
-<meta name="citation_publication_date" content="2025">
+<meta name="citation_publication_date" content="2026">
 <meta name="citation_doi" content="10.5281/zenodo.19554967">
 <meta name="citation_license" content="https://creativecommons.org/licenses/by/4.0/">
 <meta name="citation_language" content="es">
-  
-  <title>Protocolo de Intervención Digital</title>
+
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -39,11 +52,31 @@
   --gold: #b8860b;
   --border: #d5cfc4;
   --white: #fdfaf5;
+  --focus-ring: 3px solid #c0392b;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 html { scroll-behavior: smooth; }
+
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 1rem;
+  z-index: 9999;
+  padding: 0.6rem 1.2rem;
+  background: var(--accent);
+  color: var(--white);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+}
+.skip-link:focus { top: 1rem; outline: var(--focus-ring); outline-offset: 2px; }
+
+:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
+:focus:not(:focus-visible) { outline: none; }
+
+#sr-live { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
 body {
   background: var(--bg);
@@ -51,10 +84,8 @@ body {
   font-family: 'DM Sans', sans-serif;
   font-weight: 300;
   min-height: 100vh;
-  cursor: default;
 }
 
-/* GRAIN OVERLAY */
 body::before {
   content: '';
   position: fixed;
@@ -65,61 +96,91 @@ body::before {
   opacity: 0.6;
 }
 
-/* PROGRESS BAR */
 .progress-bar {
   position: fixed;
-  top: 0;
-  left: 0;
-  height: 2px;
+  top: 0; left: 0;
+  height: 3px;
   background: var(--accent);
   width: 0%;
-  transition: width 0.3s ease;
   z-index: 999;
+  transition: width 0.1s linear;
 }
 
-/* NAV */
 nav {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 1.25rem 3rem;
+  top: 0; left: 0; right: 0;
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(245,240,232,0.92);
-  backdrop-filter: blur(8px);
+  background: rgba(245,240,232,0.93);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   z-index: 100;
+  gap: 1rem;
 }
 
 .nav-logo {
   font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   letter-spacing: 0.25em;
   color: var(--muted);
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
-.nav-steps {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
+.nav-center { display: flex; gap: 0.45rem; align-items: center; }
 
 .nav-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--border);
   transition: all 0.3s;
   cursor: pointer;
+  border: none;
+  padding: 0;
 }
-
+.nav-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nav-dot.active { background: var(--accent); transform: scale(1.4); }
 .nav-dot.done { background: var(--accent2); }
 
-/* SECTIONS */
+.nav-controls { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+.lang-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink2);
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.lang-btn:hover { background: var(--ink); color: var(--white); border-color: var(--ink); }
+
+.read-global-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.read-global-btn:hover { border-color: var(--accent); color: var(--accent); }
+.read-global-btn.speaking { background: var(--accent); color: var(--white); border-color: var(--accent); }
+
 section {
   min-height: 100vh;
   display: flex;
@@ -127,7 +188,6 @@ section {
   padding: 7rem 3rem 4rem;
   position: relative;
 }
-
 section:nth-child(even) { background: var(--bg2); }
 
 .section-inner {
@@ -136,15 +196,30 @@ section:nth-child(even) { background: var(--bg2); }
   width: 100%;
   opacity: 0;
   transform: translateY(30px);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.8s cubic-bezier(0.16,1,0.3,1);
 }
+.section-inner.visible { opacity: 1; transform: translateY(0); }
 
-.section-inner.visible {
-  opacity: 1;
-  transform: translateY(0);
+.section-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
 }
+.section-read-btn:hover { border-color: var(--accent); color: var(--accent); }
+.section-read-btn.speaking { background: var(--accent); color: var(--white); border-color: var(--accent); }
+.section-read-btn svg { width: 10px; height: 10px; flex-shrink: 0; }
 
-/* HERO */
 .hero-tag {
   font-family: 'DM Mono', monospace;
   font-size: 0.6rem;
@@ -156,36 +231,19 @@ section:nth-child(even) { background: var(--bg2); }
   align-items: center;
   gap: 1rem;
 }
-
-.hero-tag::before {
-  content: '';
-  display: block;
-  width: 2.5rem;
-  height: 1px;
-  background: var(--accent);
-}
+.hero-tag::before { content: ''; display: block; width: 2.5rem; height: 1px; background: var(--accent); }
 
 h1 {
   font-family: 'DM Serif Display', serif;
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-size: clamp(2.5rem,6vw,4.5rem);
   line-height: 1.1;
   font-weight: 400;
   margin-bottom: 2rem;
   color: var(--ink);
 }
+h1 em { font-style: italic; color: var(--accent); }
 
-h1 em {
-  font-style: italic;
-  color: var(--accent);
-}
-
-.hero-sub {
-  font-size: 1.05rem;
-  line-height: 1.8;
-  color: var(--ink2);
-  max-width: 560px;
-  margin-bottom: 3rem;
-}
+.hero-sub { font-size: 1.05rem; line-height: 1.8; color: var(--ink2); max-width: 560px; margin-bottom: 3rem; }
 
 .hero-formula {
   padding: 1.5rem 2rem;
@@ -197,21 +255,9 @@ h1 em {
   line-height: 2;
   color: var(--ink2);
 }
+.hero-formula .eq { font-size: 1.1rem; color: var(--ink); font-weight: 500; }
+.hero-formula .label { color: var(--muted); font-size: 0.72rem; display: block; margin-top: 0.25rem; }
 
-.hero-formula .eq {
-  font-size: 1.1rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.hero-formula .label {
-  color: var(--muted);
-  font-size: 0.72rem;
-  display: block;
-  margin-top: 0.25rem;
-}
-
-/* BTN */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -227,20 +273,12 @@ h1 em {
   border: none;
   cursor: pointer;
   transition: all 0.2s;
-  text-decoration: none;¶
+  text-decoration: none;
 }
-
 .btn:hover { background: var(--ink); transform: translateX(4px); }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--ink2);
-  border: 1px solid var(--border);
-}
-
+.btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--ink); color: var(--white); }
 
-/* PHASE HEADER */
 .phase-num {
   font-family: 'DM Mono', monospace;
   font-size: 0.65rem;
@@ -249,27 +287,17 @@ h1 em {
   text-transform: uppercase;
   margin-bottom: 0.75rem;
 }
-
 h2 {
   font-family: 'DM Serif Display', serif;
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-size: clamp(1.8rem,4vw,2.8rem);
   font-weight: 400;
   line-height: 1.2;
   margin-bottom: 1rem;
   color: var(--ink);
 }
-
 h2 em { font-style: italic; color: var(--accent); }
+.phase-intro { font-size: 0.95rem; line-height: 1.8; color: var(--ink2); margin-bottom: 2rem; max-width: 580px; }
 
-.phase-intro {
-  font-size: 0.95rem;
-  line-height: 1.8;
-  color: var(--ink2);
-  margin-bottom: 2rem;
-  max-width: 580px;
-}
-
-/* SCIENCE BOX */
 .science {
   padding: 1.25rem 1.5rem;
   background: var(--white);
@@ -277,12 +305,10 @@ h2 em { font-style: italic; color: var(--accent); }
   margin-bottom: 2rem;
   position: relative;
 }
-
 .science::before {
   content: 'CIENCIA';
   position: absolute;
-  top: -0.6rem;
-  left: 1rem;
+  top: -0.6rem; left: 1rem;
   background: var(--white);
   padding: 0 0.5rem;
   font-family: 'DM Mono', monospace;
@@ -290,22 +316,10 @@ h2 em { font-style: italic; color: var(--accent); }
   letter-spacing: 0.25em;
   color: var(--gold);
 }
-
-.science p {
-  font-size: 0.88rem;
-  line-height: 1.75;
-  color: var(--ink2);
-}
-
+.science p { font-size: 0.88rem; line-height: 1.75; color: var(--ink2); }
 .science strong { color: var(--ink); font-weight: 400; }
 
-/* STEPS */
-.steps {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
+.steps { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
 
 .step {
   display: flex;
@@ -317,13 +331,12 @@ h2 em { font-style: italic; color: var(--accent); }
   cursor: pointer;
   align-items: flex-start;
 }
-
 .step:hover { border-color: var(--accent); transform: translateX(4px); }
+.step:focus-visible { outline: var(--focus-ring); outline-offset: 0; border-color: var(--accent); }
 .step.checked { border-color: var(--accent2); opacity: 0.7; }
 
 .step-check {
-  width: 20px;
-  height: 20px;
+  width: 20px; height: 20px;
   border: 1px solid var(--border);
   border-radius: 50%;
   flex-shrink: 0;
@@ -332,35 +345,16 @@ h2 em { font-style: italic; color: var(--accent); }
   align-items: center;
   justify-content: center;
   font-size: 0.7rem;
-  color: var(--white);
+  color: transparent;
   background: transparent;
   transition: all 0.3s;
+  pointer-events: none;
 }
+.step.checked .step-check { background: var(--accent2); border-color: var(--accent2); color: var(--white); }
+.step-content h4 { font-family: 'DM Serif Display', serif; font-size: 1rem; font-weight: 400; margin-bottom: 0.4rem; color: var(--ink); }
+.step-content p { font-size: 0.82rem; line-height: 1.65; color: var(--ink2); }
 
-.step.checked .step-check {
-  background: var(--accent2);
-  border-color: var(--accent2);
-}
-
-.step-content h4 {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1rem;
-  font-weight: 400;
-  margin-bottom: 0.4rem;
-  color: var(--ink);
-}
-
-.step-content p {
-  font-size: 0.82rem;
-  line-height: 1.65;
-  color: var(--ink2);
-}
-
-/* QUESTIONS */
-.question-block {
-  margin-bottom: 2rem;
-}
-
+.question-block { margin-bottom: 2rem; }
 .question-text {
   font-family: 'DM Serif Display', serif;
   font-size: 1.3rem;
@@ -369,12 +363,7 @@ h2 em { font-style: italic; color: var(--accent); }
   margin-bottom: 1.25rem;
   color: var(--ink);
 }
-
-.options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
+.options { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .option {
   padding: 0.9rem 1.25rem;
@@ -387,10 +376,10 @@ h2 em { font-style: italic; color: var(--accent); }
   text-align: left;
   font-family: 'DM Sans', sans-serif;
 }
-
 .option:hover { border-color: var(--accent); color: var(--ink); }
 .option.selected { border-color: var(--accent2); background: var(--accent2); color: var(--white); }
 .option.correct { border-color: var(--gold); background: #f8f4e8; color: var(--ink); }
+.option:focus-visible { outline: var(--focus-ring); outline-offset: 0; }
 
 .answer-reveal {
   margin-top: 1rem;
@@ -402,71 +391,20 @@ h2 em { font-style: italic; color: var(--accent); }
   color: var(--ink2);
   display: none;
 }
-
 .answer-reveal.show { display: block; }
 
-/* FORMULA */
-.formula-block {
-  padding: 2rem;
-  background: var(--white);
-  border: 1px solid var(--border);
-  margin-bottom: 1.5rem;
-}
-
-.formula-eq {
-  font-family: 'DM Mono', monospace;
-  font-size: clamp(0.8rem, 2.5vw, 1.1rem);
-  color: var(--ink);
-  margin-bottom: 1.5rem;
-  line-height: 2;
-}
-
+.formula-block { padding: 2rem; background: var(--white); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+.formula-eq { font-family: 'DM Mono', monospace; font-size: clamp(0.8rem,2.5vw,1.1rem); color: var(--ink); margin-bottom: 1.5rem; line-height: 2; }
 .formula-eq .var { color: var(--accent); }
 .formula-eq .op { color: var(--muted); margin: 0 0.5rem; }
-
-.formula-vars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.formula-var {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.var-name {
-  font-family: 'DM Mono', monospace;
-  color: var(--accent);
-  min-width: 2.5rem;
-  flex-shrink: 0;
-  font-size: 0.9rem;
-}
-
+.formula-vars { display: flex; flex-direction: column; gap: 0.75rem; }
+.formula-var { display: flex; gap: 1rem; align-items: flex-start; font-size: 0.82rem; line-height: 1.6; }
+.var-name { font-family: 'DM Mono', monospace; color: var(--accent); min-width: 2.5rem; flex-shrink: 0; font-size: 0.9rem; }
 .var-desc { color: var(--ink2); }
 
-/* DAYS COUNTER */
-.days-tracker {
-  margin: 2rem 0;
-}
-
-.days-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.2em;
-  color: var(--muted);
-  text-transform: uppercase;
-  margin-bottom: 1rem;
-}
-
-.days-grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
-}
+.days-tracker { margin: 2rem 0; }
+.days-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 1rem; }
+.days-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
 
 .day-cell {
   aspect-ratio: 1;
@@ -480,348 +418,352 @@ h2 em { font-style: italic; color: var(--accent); }
   font-family: 'DM Mono', monospace;
   font-size: 0.55rem;
   color: var(--muted);
-  position: relative;
 }
-
 .day-cell:hover { border-color: var(--accent); }
+.day-cell:focus-visible { outline: var(--focus-ring); outline-offset: 0; }
 .day-cell.marked { background: var(--accent2); border-color: var(--accent2); color: var(--white); }
 .day-cell.milestone { border-color: var(--gold); }
 .day-cell.milestone.marked { background: var(--gold); border-color: var(--gold); }
 
-.milestone-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  color: var(--gold);
-  margin-top: 0.75rem;
-  display: none;
-}
-
+.milestone-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--gold); margin-top: 0.75rem; display: none; }
 .milestone-label.show { display: block; }
 
-/* SCORE */
-.score-display {
-  padding: 2rem;
-  background: var(--ink);
-  color: var(--white);
-  text-align: center;
-  margin: 2rem 0;
-}
+.score-display { padding: 2rem; background: var(--ink); color: var(--white); text-align: center; margin: 2rem 0; }
+.score-num { font-family: 'DM Serif Display', serif; font-size: 4rem; color: var(--accent); line-height: 1; margin-bottom: 0.5rem; }
+.score-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+.score-text { margin-top: 1rem; font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; }
 
-.score-num {
-  font-family: 'DM Serif Display', serif;
-  font-size: 4rem;
-  color: var(--accent);
-  line-height: 1;
-  margin-bottom: 0.5rem;
-}
+.quote { padding: 2rem; border-left: 3px solid var(--accent); margin: 2rem 0; }
+.quote p { font-family: 'DM Serif Display', serif; font-size: 1.3rem; font-style: italic; line-height: 1.6; color: var(--ink); }
 
-.score-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.2em;
-  color: var(--muted);
-  text-transform: uppercase;
-}
+.divider { width: 3rem; height: 1px; background: var(--border); margin: 2rem 0; }
 
-.score-text {
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  color: #b0b0b0;
-  line-height: 1.6;
-}
-
-/* QUOTE */
-.quote {
-  padding: 2rem;
-  border-left: 3px solid var(--accent);
-  margin: 2rem 0;
-}
-
-.quote p {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.3rem;
-  font-style: italic;
-  line-height: 1.6;
-  color: var(--ink);
-}
-
-/* DIVIDER */
-.divider {
-  width: 3rem;
-  height: 1px;
-  background: var(--border);
-  margin: 2rem 0;
-}
-
-/* RESPONSIVE */
 @media (max-width: 600px) {
-  nav { padding: 1rem 1.5rem; }
+  nav { padding: 0.85rem 1.25rem; }
+  .nav-logo { display: none; }
   section { padding: 6rem 1.5rem 3rem; }
-  .days-grid { grid-template-columns: repeat(7, 1fr); }
+  .days-grid { grid-template-columns: repeat(6, 1fr); }
+}
+@media (max-width: 400px) {
+  .nav-controls { gap: 0.3rem; }
+  .lang-btn, .read-global-btn { font-size: 0.55rem; padding: 0.3rem 0.5rem; }
 }
 </style>
 </head>
 <body>
 
-<div class="progress-bar" id="progressBar"></div>
+<a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
+<div id="sr-live" aria-live="polite" aria-atomic="true"></div>
+<div class="progress-bar" id="progressBar" role="progressbar" aria-label="Progreso de lectura" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
 
-<nav>
+<nav aria-label="Navegación por secciones">
   <div class="nav-logo">Protocolo de Intervención Digital</div>
-  <div class="nav-steps">
-    <div class="nav-dot active" onclick="scrollToSection(0)" title="Inicio"></div>
-    <div class="nav-dot" onclick="scrollToSection(1)" title="Fase 1"></div>
-    <div class="nav-dot" onclick="scrollToSection(2)" title="Fase 2"></div>
-    <div class="nav-dot" onclick="scrollToSection(3)" title="Fase 3"></div>
-    <div class="nav-dot" onclick="scrollToSection(4)" title="Fase 4"></div>
-    <div class="nav-dot" onclick="scrollToSection(5)" title="La Fórmula"></div>
-    <div class="nav-dot" onclick="scrollToSection(6)" title="Los 30 días"></div>
+  <div class="nav-center" role="group" aria-label="Ir a la sección">
+    <button class="nav-dot active" onclick="scrollToSection(0)" aria-label="Inicio" title="Inicio"></button>
+    <button class="nav-dot" onclick="scrollToSection(1)" aria-label="Fase 1: Entorno" title="Fase 1"></button>
+    <button class="nav-dot" onclick="scrollToSection(2)" aria-label="Fase 2: Estabilización Biológica" title="Fase 2"></button>
+    <button class="nav-dot" onclick="scrollToSection(3)" aria-label="Fase 3: Veto Consciente" title="Fase 3"></button>
+    <button class="nav-dot" onclick="scrollToSection(4)" aria-label="Fase 4: Reemplazar la Métrica" title="Fase 4"></button>
+    <button class="nav-dot" onclick="scrollToSection(5)" aria-label="La Fórmula" title="Fórmula"></button>
+    <button class="nav-dot" onclick="scrollToSection(6)" aria-label="Calendario 30 días" title="30 días"></button>
+  </div>
+  <div class="nav-controls">
+    <a href="https://argira.eus/attention_protocol/" class="lang-btn" aria-label="Cambiar a la versión en inglés" title="Switch to English">
+      <span aria-hidden="true">🌐</span> EN
+    </a>
+    <button class="read-global-btn" id="globalStopBtn" onclick="stopSpeech()" style="display:none" aria-label="Detener la lectura en voz alta">
+      <span aria-hidden="true">⏹</span> Parar
+    </button>
   </div>
 </nav>
 
+<main id="contenido-principal">
+
 <!-- HERO -->
-<section id="s0">
+<section id="s0" aria-labelledby="hero-heading">
   <div class="section-inner">
+    <button class="section-read-btn" onclick="readSection('s0')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
     <div class="hero-tag">Protocolo · Intervención · Digital</div>
-    <h1>El sistema está<br>calibrado para<br>que <em>falles.</em></h1>
+    <h1 id="hero-heading">El sistema está<br>calibrado para<br>que <em>falles.</em></h1>
     <p class="hero-sub">
       No es falta de voluntad. Es ingeniería. Este programa te da las herramientas científicas para recuperar el control de tu atención — paso a paso, con la neurociencia detrás de cada acción.
     </p>
-    <div class="hero-formula">
+    <div class="hero-formula" role="note" aria-label="Fórmula central: R igual a F por C, menos E por V">
       <div class="eq">R = (F × C) − (E × V)</div>
-      <span class="label">R = Recuperación de atención · F = Fricción añadida · C = Conciencia del mecanismo · E = Estímulos de bajo valor · V = Velocidad de exposición</span>
+      <span class="label">R = Recuperación Atencional · F = Fricción Añadida · C = Consciencia del Mecanismo · E = Estímulos de Bajo Valor · V = Velocidad de Exposición</span>
     </div>
-    <a href="#s1" class="btn">Iniciar protocolo →</a>
+    <a href="#s1" class="btn" aria-label="Iniciar el protocolo, ir a la Fase 1">Iniciar protocolo →</a>
   </div>
 </section>
 
 <!-- FASE 1 -->
-<section id="s1">
+<section id="s1" aria-labelledby="s1-heading">
   <div class="section-inner">
-    <div class="phase-num">Fase 01 de 04</div>
-    <h2>Intervención en<br>el <em>Entorno</em></h2>
+    <button class="section-read-btn" onclick="readSection('s1')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">Fase 01 de 04</div>
+    <h2 id="s1-heading">Intervención en<br>el <em>Entorno</em></h2>
     <p class="phase-intro">
-      El sistema digital está diseñado para que tu voluntad llegue tarde. La solución no es más fuerza de voluntad — es añadir fricción donde el diseño busca fluidez.
+      El sistema digital está diseñado para que tu voluntad llegue tarde. La solución no es más voluntad — es añadir fricción donde el diseño busca fluidez.
     </p>
-
-    <div class="science">
-      <p>El cerebro humano tiene un <strong>sistema de atención involuntaria</strong> (red saliente) que responde automáticamente a estímulos brillantes, móviles y sonoros antes de que la conciencia pueda vetarlos. Las notificaciones y los colores saturados explotan exactamente este sistema. Añadir fricción — pasos extra, grises, silencio — da tiempo al <strong>lóbulo prefrontal</strong> para recuperar el control.</p>
+    <div class="science" role="note" aria-label="Base científica">
+      <p>El cerebro humano tiene un <strong>sistema de atención involuntaria</strong> (red saliente) que responde automáticamente a estímulos brillantes, en movimiento y ruidosos antes de que la conciencia pueda vetarlos. Las notificaciones y los colores saturados explotan exactamente este sistema. Añadir fricción — pasos extra, escala de grises, silencio — le da tiempo al <strong>lóbulo prefrontal</strong> de recuperar el control.</p>
     </div>
-
-    <div class="steps" id="steps1">
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+    <div class="steps" role="group" aria-label="Pasos de acción de la Fase 1 — pulsa Enter para marcar como completado">
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s1-step1"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Modo Escala de Grises — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Escala de Grises</h4>
-          <p>Configura la pantalla en blanco y negro. Elimina el valor predictivo de los colores brillantes que activan la dopamina fásica. El sistema se vuelve visualmente inerte. <em>iOS: Ajustes → Accesibilidad → Tamaño y texto → Filtros de color.</em></p>
+          <h4>Modo Escala de Grises</h4>
+          <p>Pon tu pantalla en blanco y negro. Elimina el valor predictivo de los colores brillantes que activan la dopamina fásica. El sistema se vuelve visualmente inerte. <em>iOS: Configuración → Accesibilidad → Pantalla y Tamaño de Texto → Filtros de Color.</em></p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s1-step2"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Eliminar Activadores — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Eliminación de Disparadores</h4>
-          <p>Desactiva todas las notificaciones no humanas. Cada "push" es una instrucción de ejecución que secuestra tu atención antes de que puedas vetarla. Solo llamadas y mensajes directos de personas reales.</p>
+          <h4>Eliminar Activadores</h4>
+          <p>Desactiva todas las notificaciones no humanas. Cada "push" es una orden de ejecución que secuestra tu atención antes de que puedas vetarla. Solo llamadas y mensajes directos de personas reales.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s1-step3"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Barreras Físicas — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>Barreras Físicas</h4>
-          <p>El móvil fuera de la habitación durante periodos de profundidad cognitiva. Si el objeto está a la vista, tu cerebro reserva recursos para ignorarlo — agotándote incluso sin usarlo. La mera presencia del dispositivo reduce el rendimiento cognitivo.</p>
+          <p>Teléfono fuera del dormitorio durante períodos de profundidad cognitiva. Si el objeto está a la vista, tu cerebro reserva recursos para ignorarlo — agotándote incluso sin usarlo. La mera presencia del dispositivo reduce el rendimiento cognitivo.</p>
         </div>
       </div>
     </div>
-
-    <!-- PREGUNTA -->
-    <div class="question-block">
-      <div class="question-text">"¿Por qué ver el móvil aunque no lo uses te agota?"</div>
-      <div class="options">
-        <button class="option" onclick="selectOption(this, false, 'q1')">Porque genera ansiedad consciente</button>
-        <button class="option" onclick="selectOption(this, true, 'q1')">Porque el cerebro usa recursos para inhibir la respuesta al estímulo</button>
-        <button class="option" onclick="selectOption(this, false, 'q1')">Porque la pantalla emite radiación que cansa</button>
+    <div class="question-block" role="group" aria-labelledby="q1-text">
+      <div class="question-text" id="q1-text">"¿Por qué ver tu teléfono — sin usarlo — te agota?"</div>
+      <div class="options" role="radiogroup" aria-labelledby="q1-text">
+        <button class="option" onclick="selectOption(this,false,'q1')" data-opt-id="q1-0">Porque genera ansiedad consciente</button>
+        <button class="option" onclick="selectOption(this,true,'q1')" data-opt-id="q1-1">Porque el cerebro usa recursos para inhibir la respuesta al estímulo</button>
+        <button class="option" onclick="selectOption(this,false,'q1')" data-opt-id="q1-2">Porque la pantalla emite radiación que cansa</button>
       </div>
-      <div class="answer-reveal" id="q1-reveal">
-        El fenómeno se llama <strong>inhibición cognitiva activa</strong>. Cuando un objeto saliente está en tu campo visual, tu red de atención involuntaria genera un impulso de orientación. Suprimir ese impulso repetidamente consume glucosa y recursos del lóbulo prefrontal — exactamente el mismo recurso que usas para pensar en profundidad.
+      <div class="answer-reveal" id="q1-reveal" role="alert" aria-live="polite">
+        El fenómeno se llama <strong>inhibición cognitiva activa</strong>. Cuando un objeto saliente está en tu campo visual, tu red de atención involuntaria genera un impulso de orientación. Suprimir ese impulso repetidamente consume glucosa y recursos del lóbulo prefrontal — exactamente el mismo recurso que usas para el pensamiento profundo.
       </div>
     </div>
-
     <a href="#s2" class="btn">Fase 2 →</a>
   </div>
 </section>
 
 <!-- FASE 2 -->
-<section id="s2">
+<section id="s2" aria-labelledby="s2-heading">
   <div class="section-inner">
-    <div class="phase-num">Fase 02 de 04</div>
-    <h2>Estabilización<br><em>Biológica</em></h2>
+    <button class="section-read-btn" onclick="readSection('s2')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">Fase 02 de 04</div>
+    <h2 id="s2-heading">Estabilización<br><em>Biológica</em></h2>
     <p class="phase-intro">
-      Cuando el sistema está saturado, los receptores de dopamina se "ocultan" para protegerse de la sobreestimulación. Para recuperarlos, necesitas reducir el ruido — no añadir más señal.
+      Cuando el sistema está saturado, los receptores de dopamina se "esconden" para protegerse de la sobreestimulación. Para recuperarlos, necesitas reducir el ruido — no añadir más señal.
     </p>
-
-    <div class="science">
-      <p>La <strong>downregulation dopaminérgica</strong> ocurre cuando los receptores D2 reducen su densidad en respuesta a la sobreestimulación crónica. El cerebro no puede distinguir entre dopamina real (logro, conexión) y dopamina artificial (scroll, likes). El resultado: necesitas más estímulo para sentir lo mismo. La solución es un <strong>ayuno de dopamina selectivo</strong> — no eliminar toda estimulación, sino eliminar la de bajo valor y alta frecuencia.</p>
+    <div class="science" role="note" aria-label="Base científica">
+      <p>La <strong>downregulación dopaminérgica</strong> ocurre cuando los receptores D2 reducen su densidad en respuesta a la sobreestimulación crónica. El cerebro no puede distinguir entre dopamina real (logro, conexión) y dopamina artificial (scroll, likes). El resultado: necesitas más estímulo para sentir lo mismo. La solución es un <strong>ayuno selectivo de dopamina</strong> — no eliminar toda la estimulación, sino la de bajo valor y alta frecuencia.</p>
     </div>
-
-    <div class="steps" id="steps2">
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+    <div class="steps" role="group" aria-label="Pasos de acción de la Fase 2">
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s2-step1"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Ayuno de Estímulos de Bajo Valor — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>Ayuno de Estímulos de Bajo Valor</h4>
-          <p>Identifica las tareas de "relleno" — scroll infinito, vídeos cortos, noticias sin fin — y sustitúyelas por actividades de alta recompensa retardada: leer en papel, caminar sin audio, tareas manuales. La clave es que la recompensa llegue después del esfuerzo.</p>
+          <p>Identifica las tareas "relleno" — scroll infinito, vídeos cortos, noticias interminables — y sustitúyelas por actividades de alta recompensa retardada: lectura en papel, caminar sin audio, tareas manuales. La clave es que la recompensa llegue después del esfuerzo.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s2-step2"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Exposición al Aburrimiento — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>Exposición al Aburrimiento</h4>
-          <p>El aburrimiento es la señal de que el sistema busca una métrica de valor. No la tapes con ruido. Permite que el sistema se estabilice en el vacío. Los receptores vuelven a la superficie cuando el nivel basal de estimulación baja. La incomodidad inicial es el síntoma de que funciona.</p>
+          <p>El aburrimiento es la señal de que el sistema está buscando una métrica de valor. No lo enmascarares con ruido. Permite que el sistema se estabilice en el vacío. Los receptores regresan a la superficie cuando el nivel de estimulación basal baja. El malestar inicial es la señal de que funciona.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s2-step3"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Luz Solar Matutina — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>Luz Solar Matutina</h4>
-          <p>La luz natural en los primeros 30 minutos del día regula la síntesis de dopamina y el ciclo circadiano, preparando la base química para el resto de la jornada. Sin pantallas antes de esta exposición — la luz artificial matutina interfiere con la señal de cortisol.</p>
+          <p>La luz natural en los primeros 30 minutos del día regula la síntesis de dopamina y el ciclo circadiano, preparando la base química para el resto del día. Sin pantallas antes de esta exposición — la luz artificial matutina interfiere con la señal de cortisol.</p>
         </div>
       </div>
     </div>
-
-    <div class="question-block">
-      <div class="question-text">"¿Qué significa sentir vacío al dejar de hacer scroll?"</div>
-      <div class="options">
-        <button class="option" onclick="selectOption(this, false, 'q2')">Que eres más sensible que otras personas</button>
-        <button class="option" onclick="selectOption(this, false, 'q2')">Que el contenido era realmente importante para ti</button>
-        <button class="option" onclick="selectOption(this, true, 'q2')">Que tus receptores de dopamina están en proceso de recalibración</button>
+    <div class="question-block" role="group" aria-labelledby="q2-text">
+      <div class="question-text" id="q2-text">"¿Qué significa sentirse vacío al dejar de hacer scroll?"</div>
+      <div class="options" role="radiogroup" aria-labelledby="q2-text">
+        <button class="option" onclick="selectOption(this,false,'q2')" data-opt-id="q2-0">Que eres más sensible que otras personas</button>
+        <button class="option" onclick="selectOption(this,false,'q2')" data-opt-id="q2-1">Que el contenido era realmente importante para ti</button>
+        <button class="option" onclick="selectOption(this,true,'q2')" data-opt-id="q2-2">Que tus receptores de dopamina están en proceso de recalibración</button>
       </div>
-      <div class="answer-reveal" id="q2-reveal">
-        Ese vacío es la señal biológica más importante del protocolo. Significa que el nivel basal de estimulación ha bajado y los receptores están emergiendo. <strong>No es depresión ni aburrimiento patológico</strong> — es el sistema nervioso recalibrando su umbral. Dura entre 3 y 14 días según el nivel de saturación previo. Atravesarlo sin añadir ruido es la acción más poderosa del protocolo.
+      <div class="answer-reveal" id="q2-reveal" role="alert" aria-live="polite">
+        Ese vacío es la señal biológica más importante del protocolo. Significa que el nivel de estimulación basal ha bajado y los receptores están emergiendo. <strong>No es depresión ni aburrimiento patológico</strong> — es el sistema nervioso recalibrando su umbral. Dura entre 3 y 14 días según el nivel de saturación previo. Atravesarlo sin añadir ruido es la acción más poderosa del protocolo.
       </div>
     </div>
-
     <a href="#s3" class="btn">Fase 3 →</a>
   </div>
 </section>
 
 <!-- FASE 3 -->
-<section id="s3">
+<section id="s3" aria-labelledby="s3-heading">
   <div class="section-inner">
-    <div class="phase-num">Fase 03 de 04</div>
-    <h2>El Veto de<br><em>Conciencia</em></h2>
+    <button class="section-read-btn" onclick="readSection('s3')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">Fase 03 de 04</div>
+    <h2 id="s3-heading">El Veto<br><em>Consciente</em></h2>
     <p class="phase-intro">
-      No puedes parar el impulso. Pero puedes crear un espacio entre el impulso y la acción. Ese espacio es donde vive la libertad.
+      No puedes detener el impulso. Pero puedes crear un espacio entre el impulso y la acción. Ese espacio es donde vive la libertad.
     </p>
-
-    <div class="science">
-      <p>Benjamin Libet demostró que el cerebro genera una señal de movimiento <strong>300-500ms antes</strong> de que seamos conscientes de querer movernos. Pero también encontró algo crítico: existe una <strong>ventana de veto consciente</strong> en los últimos 200ms. No puedes evitar que el impulso aparezca. Sí puedes vetarlo. El Protocolo de los 5 Segundos es exactamente esa ventana ampliada.</p>
+    <div class="science" role="note" aria-label="Base científica">
+      <p>Benjamin Libet demostró que el cerebro genera una señal de movimiento <strong>300–500ms antes</strong> de que seamos conscientes de querer movernos. Pero también encontró algo crítico: existe una <strong>ventana de veto consciente</strong> en los últimos 200ms. No puedes evitar que aparezca el impulso. Puedes vetarlo. El Protocolo de 5 Segundos es exactamente esa ventana expandida.</p>
     </div>
-
-    <div class="quote">
-      <p>"Cuando te sorprendas abriendo una app por hábito, no la cierres con culpa. Observa el impulso. Mantén la app abierta 5 segundos sin interactuar. Ese espacio devuelve el control al lóbulo frontal."</p>
+    <div class="quote" role="blockquote">
+      <p>"Cuando te pillas abriendo una app por inercia, no la cierres con culpa. Observa el impulso. Mantén la app abierta 5 segundos sin interactuar. Ese espacio devuelve el control al lóbulo frontal."</p>
     </div>
-
-    <div class="steps">
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+    <div class="steps" role="group" aria-label="Pasos de acción de la Fase 3">
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s3-step1"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Paso 1: Detectar — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Paso 1 — Detecta</h4>
-          <p>Observa que has abierto la app. No te juzgues. El juicio es otro estímulo que consume recursos prefrontales. Solo observa: "Acabo de abrir esto sin decidirlo."</p>
+          <h4>Paso 1 — Detectar</h4>
+          <p>Date cuenta de que has abierto la app. No te juzgues. El juicio es otro estímulo que consume recursos prefrontales. Solo observa: "acabo de abrir esto sin haberlo decidido."</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s3-step2"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Paso 2: Pausa de 5 Segundos — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Paso 2 — Pausa de 5 segundos</h4>
-          <p>Mantén la app abierta. No interactúas. Cuentas 5 segundos. Esto activa el córtex prefrontal ventrolateral — el freno neurológico del cerebro — que normalmente llega tarde cuando el hábito ya se ejecutó.</p>
+          <h4>Paso 2 — Pausa de 5 Segundos</h4>
+          <p>Mantén la app abierta. No interactúes. Cuenta 5 segundos. Esto activa la corteza prefrontal ventrolateral — el freno neurológico del cerebro — que normalmente llega tarde, después de que el hábito ya se ha ejecutado.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s3-step3"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Paso 3: La Pregunta — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Paso 3 — La pregunta</h4>
-          <p>¿Es una decisión o una ejecución automática? Si es automática, cierra. Si hay una razón real, continúa con intención. La diferencia no está en lo que haces — está en si lo elegiste.</p>
+          <h4>Paso 3 — La Pregunta</h4>
+          <p>¿Es esto una decisión o una ejecución automática? Si es automática, ciérrala. Si hay una razón real, continúa con intención. La diferencia no está en lo que haces — está en si lo elegiste.</p>
         </div>
       </div>
     </div>
-
-    <div class="question-block">
-      <div class="question-text">"¿Por qué la culpa al cerrar la app no funciona como estrategia?"</div>
-      <div class="options">
-        <button class="option" onclick="selectOption(this, false, 'q3')">Porque la culpa no existe realmente</button>
-        <button class="option" onclick="selectOption(this, true, 'q3')">Porque la culpa es un estímulo emocional que agota el mismo recurso que necesitas para el autocontrol</button>
-        <button class="option" onclick="selectOption(this, false, 'q3')">Porque el cerebro no registra emociones negativas</button>
+    <div class="question-block" role="group" aria-labelledby="q3-text">
+      <div class="question-text" id="q3-text">"¿Por qué la culpa no funciona como estrategia al cerrar la app?"</div>
+      <div class="options" role="radiogroup" aria-labelledby="q3-text">
+        <button class="option" onclick="selectOption(this,false,'q3')" data-opt-id="q3-0">Porque la culpa no existe realmente</button>
+        <button class="option" onclick="selectOption(this,true,'q3')" data-opt-id="q3-1">Porque la culpa es un estímulo emocional que agota el mismo recurso que necesitas para el autocontrol</button>
+        <button class="option" onclick="selectOption(this,false,'q3')" data-opt-id="q3-2">Porque el cerebro no registra las emociones negativas</button>
       </div>
-      <div class="answer-reveal" id="q3-reveal">
-        El autocontrol y la regulación emocional comparten recursos en el <strong>córtex prefrontal</strong>. Cuando usas energía en sentirte mal por haber fallado, reduces exactamente la capacidad que necesitas para no fallar la próxima vez. El protocolo correcto es <strong>observación sin juicio</strong> — registrar el comportamiento como dato, no como fallo moral. Eso preserva el recurso y aumenta la probabilidad de éxito en la siguiente ocasión.
+      <div class="answer-reveal" id="q3-reveal" role="alert" aria-live="polite">
+        El autocontrol y la regulación emocional comparten recursos en la <strong>corteza prefrontal</strong>. Cuando usas energía sintiéndote mal por haber fallado, reduces exactamente la capacidad que necesitas para no fallar la próxima vez. El protocolo correcto es la <strong>observación no juiciosa</strong> — registrar el comportamiento como dato, no como fracaso moral. Eso preserva recursos y aumenta la probabilidad de éxito en el siguiente intento.
       </div>
     </div>
-
     <a href="#s4" class="btn">Fase 4 →</a>
   </div>
 </section>
 
 <!-- FASE 4 -->
-<section id="s4">
+<section id="s4" aria-labelledby="s4-heading">
   <div class="section-inner">
-    <div class="phase-num">Fase 04 de 04</div>
-    <h2>Sustitución<br>de la <em>Métrica</em></h2>
+    <button class="section-read-btn" onclick="readSection('s4')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">Fase 04 de 04</div>
+    <h2 id="s4-heading">Reemplazar<br>la <em>Métrica</em></h2>
     <p class="phase-intro">
-      El móvil como entorno de habitación — un lugar donde "estar" — es el diseño que más daño hace. La solución es convertirlo en herramienta de ejecución: entra con una tarea, sal cuando está completada.
+      El teléfono como entorno que "habitar" — un lugar donde "estar" — es el diseño que más daño produce. La solución es convertirlo en una herramienta de ejecución: entrar con una tarea, salir al terminarla.
     </p>
-
-    <div class="science">
-      <p>El cerebro opera con <strong>sistemas de recompensa orientados a objetivos</strong> (goal-directed) y sistemas de <strong>hábito</strong> (habit-based). Las plataformas digitales están diseñadas para mover el comportamiento del primer sistema al segundo — de la elección al automatismo. Definir una tarea antes de entrar activa el sistema goal-directed y lo mantiene en control durante la sesión, previniendo que el hábito tome el mando.</p>
+    <div class="science" role="note" aria-label="Base científica">
+      <p>El cerebro opera con <strong>sistemas de recompensa dirigidos por objetivos</strong> y <strong>sistemas basados en hábitos</strong>. Las plataformas digitales están diseñadas para mover el comportamiento del primer sistema al segundo — de la elección al automatismo. Definir una tarea antes de entrar activa el sistema dirigido por objetivos y lo mantiene en control durante la sesión, impidiendo que el hábito tome el mando.</p>
     </div>
-
-    <div class="steps">
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+    <div class="steps" role="group" aria-label="Pasos de acción de la Fase 4">
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s4-step1"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Tarea Previa Única — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
-          <h4>Tarea Única Previa</h4>
-          <p>Define en voz alta o por escrito qué vas a hacer antes de tocar el dispositivo. "Voy a responder el mensaje de Ana y cerrar." La verbalización activa el sistema prefrontal y crea un contrato cognitivo contigo mismo.</p>
+          <h4>Tarea Previa Única</h4>
+          <p>Define en voz alta o por escrito lo que vas a hacer antes de tocar el dispositivo. "Voy a responder el mensaje de Ana y cerrarlo." La verbalización activa el sistema prefrontal y crea un contrato cognitivo contigo mismo.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s4-step2"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="El Dispositivo como Herramienta — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>El Dispositivo como Herramienta</h4>
-          <p>Trata el móvil como un martillo: lo coges para clavar, lo dejas cuando has clavado. No "habitas" en un martillo. La metáfora cambia la relación cognitiva con el objeto antes de tocarlo.</p>
+          <p>Trata el teléfono como un martillo: lo coges para clavar un clavo, lo dejas cuando lo has clavado. No "habitas" un martillo. La metáfora cambia la relación cognitiva con el objeto antes de tocarlo.</p>
         </div>
       </div>
-      <div class="step" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
+      <div class="step" role="checkbox" aria-checked="false" tabindex="0"
+           data-step-id="s4-step3"
+           onclick="toggleStep(this)" onkeydown="stepKeydown(event,this)"
+           aria-label="Cierre Consciente — marcar como hecho">
+        <div class="step-check" aria-hidden="true">✓</div>
         <div class="step-content">
           <h4>Cierre Consciente</h4>
-          <p>Cuando termines la tarea, cierra activamente y di internamente "completado". Este micro-ritual activa el sistema de recompensa con la tarea real — no con el scroll que viene después — y refuerza el circuito goal-directed.</p>
+          <p>Al terminar la tarea, ciérralo activamente y di internamente "completado." Este micro-ritual activa el sistema de recompensa con la tarea real — no con el scroll que viene después — y refuerza el circuito dirigido por objetivos.</p>
         </div>
       </div>
     </div>
-
-    <div class="question-block">
-      <div class="question-text">"¿Qué diferencia hay entre usar el móvil como herramienta y como entorno?"</div>
-      <div class="options">
-        <button class="option" onclick="selectOption(this, false, 'q4')">Solo el tiempo — si usas menos tiempo, es herramienta</button>
-        <button class="option" onclick="selectOption(this, true, 'q4')">La intención previa — si entras con objetivo, es herramienta; si "habitas" en él, es entorno</button>
-        <button class="option" onclick="selectOption(this, false, 'q4')">Las apps que usas — redes sociales son entorno, el resto herramienta</button>
+    <div class="question-block" role="group" aria-labelledby="q4-text">
+      <div class="question-text" id="q4-text">"¿Cuál es la diferencia entre usar el teléfono como herramienta y como entorno?"</div>
+      <div class="options" role="radiogroup" aria-labelledby="q4-text">
+        <button class="option" onclick="selectOption(this,false,'q4')" data-opt-id="q4-0">Solo el tiempo — si usas menos tiempo, es una herramienta</button>
+        <button class="option" onclick="selectOption(this,true,'q4')" data-opt-id="q4-1">La intención previa — si entras con un objetivo, es herramienta; si lo "habitas", es entorno</button>
+        <button class="option" onclick="selectOption(this,false,'q4')" data-opt-id="q4-2">Las apps que usas — las redes sociales son entorno, todo lo demás es herramienta</button>
       </div>
-      <div class="answer-reveal" id="q4-reveal">
-        La distinción no es de tiempo ni de app — es de <strong>modo cognitivo</strong>. Puedes pasar 2 minutos en Instagram de forma goal-directed (buscas algo concreto, lo encuentras, sales) o 2 horas en el email en modo hábito (revisas sin razón, sin salida definida). Lo que activa uno u otro modo es la <strong>intención previa</strong>. Sin intención, el sistema de hábito toma el control en los primeros 8-15 segundos de sesión.
+      <div class="answer-reveal" id="q4-reveal" role="alert" aria-live="polite">
+        La distinción no es el tiempo ni la app — es el <strong>modo cognitivo</strong>. Puedes estar 2 minutos en Instagram de forma dirigida por objetivos (buscas algo concreto, lo encuentras, salís) o 2 horas en el email en modo hábito (revisas sin razón, sin una salida definida). Lo que activa un modo u otro es la <strong>intención previa</strong>. Sin intención, el sistema habitual toma el control en los primeros 8–15 segundos de la sesión.
       </div>
     </div>
-
     <a href="#s5" class="btn">Ver la Fórmula →</a>
   </div>
 </section>
 
-<!-- FORMULA -->
-<section id="s5">
+<!-- FÓRMULA -->
+<section id="s5" aria-labelledby="s5-heading">
   <div class="section-inner">
-    <div class="phase-num">La Fórmula</div>
-    <h2>R = (F × C)<br><em>− (E × V)</em></h2>
+    <button class="section-read-btn" onclick="readSection('s5')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">La Fórmula</div>
+    <h2 id="s5-heading">R = (F × C)<br><em>− (E × V)</em></h2>
     <p class="phase-intro">
-      Cada acción del protocolo actúa sobre una variable de esta ecuación. No es metáfora — es la estructura real del problema y su solución.
+      Cada acción del protocolo actúa sobre una variable de esta ecuación. No es una metáfora — es la estructura real del problema y su solución.
     </p>
-
-    <div class="formula-block">
-      <div class="formula-eq">
+    <div class="formula-block" role="note" aria-label="Desglose de la fórmula">
+      <div class="formula-eq" aria-label="R igual a F por C, menos E por V">
         <span class="var">R</span> <span class="op">=</span>
         <span>(</span><span class="var">F</span> <span class="op">×</span> <span class="var">C</span><span>)</span>
         <span class="op">−</span>
@@ -829,217 +771,305 @@ h2 em { font-style: italic; color: var(--accent); }
       </div>
       <div class="formula-vars">
         <div class="formula-var">
-          <span class="var-name">R</span>
-          <span class="var-desc"><strong>Recuperación de atención.</strong> Lo que buscamos. No perfección — dirección. Cada punto ganado en R es un momento más de vida que vives tú, no el algoritmo.</span>
+          <span class="var-name" aria-hidden="true">R</span>
+          <span class="var-desc"><strong>Recuperación Atencional.</strong> Lo que buscamos. No perfección — dirección. Cada punto ganado en R es un momento más de vida que tú vives, no el algoritmo.</span>
         </div>
         <div class="formula-var">
-          <span class="var-name">F</span>
-          <span class="var-desc"><strong>Fricción añadida.</strong> Grises, barreras físicas, notificaciones apagadas. Cada paso de fricción que añades al sistema multiplica tu capacidad de veto consciente.</span>
+          <span class="var-name" aria-hidden="true">F</span>
+          <span class="var-desc"><strong>Fricción Añadida.</strong> Escala de grises, barreras físicas, notificaciones desactivadas. Cada paso de fricción que añades multiplica tu capacidad de veto consciente.</span>
         </div>
         <div class="formula-var">
-          <span class="var-name">C</span>
-          <span class="var-desc"><strong>Conciencia del mecanismo.</strong> Entender por qué funciona así. No como información abstracta — como herramienta activa. Un niño que entiende que la app está diseñada para atraparlo tiene una defensa que ningún control parental puede dar.</span>
+          <span class="var-name" aria-hidden="true">C</span>
+          <span class="var-desc"><strong>Consciencia del Mecanismo.</strong> Entender por qué funciona así. No como información abstracta — como herramienta activa. Un niño que entiende que la app está diseñada para atraparle tiene una defensa que ningún control parental puede proporcionar.</span>
         </div>
         <div class="formula-var">
-          <span class="var-name">E</span>
-          <span class="var-desc"><strong>Estímulos de bajo valor.</strong> Scroll infinito, vídeos cortos, noticias sin fin. Cuantos más reduces, más espacio abres para los de alto valor.</span>
+          <span class="var-name" aria-hidden="true">E</span>
+          <span class="var-desc"><strong>Estímulos de Bajo Valor.</strong> Scroll infinito, vídeos cortos, noticias interminables. Cuanto más los reduces, más espacio abres para los de alto valor.</span>
         </div>
         <div class="formula-var">
-          <span class="var-name">V</span>
-          <span class="var-desc"><strong>Velocidad de exposición.</strong> La frecuencia con que el sistema te lanza estímulos. Reducir V — menos sesiones, más cortas — reduce el producto E×V que resta a tu recuperación.</span>
+          <span class="var-name" aria-hidden="true">V</span>
+          <span class="var-desc"><strong>Velocidad de Exposición.</strong> La frecuencia con la que el sistema te lanza estímulos. Reducir V — menos sesiones, más cortas — reduce el producto E×V que resta a tu recuperación.</span>
         </div>
       </div>
     </div>
-
-    <div class="question-block">
-      <div class="question-text">"¿Cuál es la variable más poderosa que puedes cambiar hoy?"</div>
-      <div class="options">
-        <button class="option" onclick="selectOption(this, false, 'q5')">E — eliminar todas las apps de redes sociales</button>
-        <button class="option" onclick="selectOption(this, true, 'q5')">C — entender el mecanismo, porque multiplica el efecto de todas las demás acciones</button>
-        <button class="option" onclick="selectOption(this, false, 'q5')">V — no mirar el móvil nunca</button>
+    <div class="question-block" role="group" aria-labelledby="q5-text">
+      <div class="question-text" id="q5-text">"¿Cuál es la variable más poderosa que puedes cambiar hoy?"</div>
+      <div class="options" role="radiogroup" aria-labelledby="q5-text">
+        <button class="option" onclick="selectOption(this,false,'q5')" data-opt-id="q5-0">E — eliminar todas las apps de redes sociales</button>
+        <button class="option" onclick="selectOption(this,true,'q5')" data-opt-id="q5-1">C — entender el mecanismo, porque multiplica el efecto de todas las demás acciones</button>
+        <button class="option" onclick="selectOption(this,false,'q5')" data-opt-id="q5-2">V — no mirar nunca el teléfono</button>
       </div>
-      <div class="answer-reveal" id="q5-reveal">
-        C es la variable multiplicadora. Puedes añadir fricción sin entender por qué y el sistema te vencerá en cuanto bajes la guardia. Pero cuando entiendes el mecanismo — cuando sabes exactamente qué está haciendo la app con tu dopamina y por qué — cada acción de fricción que añades se vuelve intencional y sostenible. <strong>La conciencia no te protege sola. Pero sin ella, ninguna otra protección dura.</strong>
+      <div class="answer-reveal" id="q5-reveal" role="alert" aria-live="polite">
+        C es la variable multiplicadora. Puedes añadir fricción sin entender por qué, y el sistema te derrotará en cuanto bajes la guardia. Pero cuando entiendes el mecanismo — cuando sabes exactamente qué está haciendo la app a tu dopamina y por qué — cada acción de fricción que añades se vuelve intencional y sostenible. <strong>La consciencia sola no te protege. Pero sin ella, ninguna otra protección dura.</strong>
       </div>
     </div>
-
-    <a href="#s6" class="btn">Los 30 días →</a>
+    <a href="#s6" class="btn">Los 30 Días →</a>
   </div>
 </section>
 
 <!-- 30 DÍAS -->
-<section id="s6">
+<section id="s6" aria-labelledby="s6-heading">
   <div class="section-inner">
-    <div class="phase-num">El Calendario</div>
-    <h2>30 días para<br>recalibrar el <em>sistema.</em></h2>
+    <button class="section-read-btn" onclick="readSection('s6')" aria-label="Leer esta sección en voz alta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      Escuchar
+    </button>
+    <div class="phase-num" aria-hidden="true">El Calendario</div>
+    <h2 id="s6-heading">30 días para<br>recalibrar el <em>sistema.</em></h2>
     <p class="phase-intro">
-      El cerebro necesita entre 14 y 30 días de reducción de estímulos para que los receptores de dopamina regresen a sus niveles basales. Marca cada día. La sensación de vacío inicial es la señal de que funciona.
+      El cerebro necesita entre 14 y 30 días de estimulación reducida para que los receptores de dopamina vuelvan a los niveles basales. Marca cada día. La sensación inicial de vacío es la señal de que está funcionando.
     </p>
-
     <div class="days-tracker">
-      <div class="days-label">Marca cada día completado — Haz clic para registrar</div>
-      <div class="days-grid" id="daysGrid"></div>
-      <div class="milestone-label" id="milestone7">⟶ Día 7: Los primeros hábitos de fricción están instalados.</div>
-      <div class="milestone-label" id="milestone14">⟶ Día 14: Los receptores de dopamina empiezan a emerger. El vacío disminuye.</div>
-      <div class="milestone-label" id="milestone30">⟶ Día 30: Línea base recalibrada. Lo que antes necesitabas para sentir satisfacción, ahora lo encuentras en menos.</div>
+      <div class="days-label" id="days-instructions">Marca cada día completado — Clic o pulsa Enter para registrar</div>
+      <div class="days-grid" id="daysGrid" role="group" aria-label="Cuadrícula de seguimiento de 30 días" aria-describedby="days-instructions"></div>
+      <div class="milestone-label" id="milestone7" role="status">⟶ Día 7: Los primeros hábitos de fricción están instalados.</div>
+      <div class="milestone-label" id="milestone14" role="status">⟶ Día 14: Los receptores de dopamina comienzan a emerger. El vacío disminuye.</div>
+      <div class="milestone-label" id="milestone30" role="status">⟶ Día 30: Línea base recalibrada. Lo que antes necesitabas para sentir satisfacción, ahora lo encuentras en menos.</div>
     </div>
-
-    <div class="score-display" id="scoreDisplay">
+    <div class="score-display" role="status" aria-live="polite" aria-atomic="true">
       <div class="score-num" id="scoreNum">0</div>
       <div class="score-label">Días completados</div>
       <div class="score-text" id="scoreText">Empieza hoy. No mañana.</div>
     </div>
-
-    <div class="divider"></div>
-
-    <div class="quote">
-      <p>"No se trata de usar menos tecnología. Se trata de que la uses tú a ella — y no ella a ti."</p>
+    <div class="divider" aria-hidden="true"></div>
+    <div class="quote" role="blockquote">
+      <p>"No se trata de usar menos tecnología. Se trata de que tú la uses a ella — no ella a ti."</p>
     </div>
-
     <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:2rem;">
-      <button class="btn btn-ghost" onclick="resetDays()">Reiniciar calendario</button>
-      <a href="#s0" class="btn">Volver al inicio ↑</a>
+      <button class="btn btn-ghost" onclick="resetDays()" aria-label="Reiniciar el calendario de 30 días">Reiniciar calendario</button>
+      <a href="#s0" class="btn">Volver arriba ↑</a>
     </div>
-
+    <div style="text-align:center; padding:2rem 1rem 1rem; font-size:0.7rem; font-family:'DM Mono',monospace; color:var(--muted); border-top:1px solid var(--border); margin-top:2rem;" role="contentinfo">
+      © 2026 Jose Ranero García ·
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:none;">CC BY 4.0</a> ·
+      DOI: <a href="https://doi.org/10.5281/zenodo.19554967" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:none;">10.5281/zenodo.19554967</a> ·
+      ORCID: 0009-0009-3168-6379
+    </div>
   </div>
 </section>
 
+</main>
+
 <script>
-// PROGRESS BAR
+const STORE_KEY = 'protocolo_v1';
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+}
+function saveState(s) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch {}
+}
+
+function announce(msg) {
+  const el = document.getElementById('sr-live');
+  el.textContent = '';
+  setTimeout(() => { el.textContent = msg; }, 50);
+}
+
+// PROGRESS BAR (rAF throttled)
+let ticking = false;
 window.addEventListener('scroll', () => {
-  const scrollTop = window.scrollY;
-  const docHeight = document.body.scrollHeight - window.innerHeight;
-  const progress = (scrollTop / docHeight) * 100;
-  document.getElementById('progressBar').style.width = progress + '%';
+  if (!ticking) {
+    requestAnimationFrame(() => {
+      const scrollTop = window.scrollY;
+      const docH = document.body.scrollHeight - window.innerHeight;
+      const pct = docH > 0 ? Math.round((scrollTop / docH) * 100) : 0;
+      const bar = document.getElementById('progressBar');
+      bar.style.width = pct + '%';
+      bar.setAttribute('aria-valuenow', pct);
+      ticking = false;
+    });
+    ticking = true;
+  }
 });
 
-// SCROLL TO SECTION
+// NAV
 const sections = ['s0','s1','s2','s3','s4','s5','s6'];
 function scrollToSection(i) {
   document.getElementById(sections[i]).scrollIntoView({ behavior: 'smooth' });
 }
-
-// INTERSECTION OBSERVER
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.querySelector('.section-inner').classList.add('visible');
-      const idx = sections.indexOf(entry.target.id);
-      if (idx !== -1) updateNav(idx);
-    }
-  });
-}, { threshold: 0.3 });
-
-sections.forEach(id => {
-  const el = document.getElementById(id);
-  if (el) observer.observe(el);
-});
-
 function updateNav(activeIdx) {
   document.querySelectorAll('.nav-dot').forEach((dot, i) => {
-    dot.classList.remove('active', 'done');
+    dot.classList.remove('active','done');
     if (i === activeIdx) dot.classList.add('active');
     else if (i < activeIdx) dot.classList.add('done');
   });
 }
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const inner = entry.target.querySelector('.section-inner');
+      if (inner) inner.classList.add('visible');
+      const idx = sections.indexOf(entry.target.id);
+      if (idx !== -1) updateNav(idx);
+    }
+  });
+}, { threshold: 0.25 });
+sections.forEach(id => { const el = document.getElementById(id); if (el) observer.observe(el); });
 
-// STEP TOGGLE
+// STEPS
 function toggleStep(el) {
-  el.classList.toggle('checked');
+  const stepId = el.dataset.stepId;
+  const isChecked = el.classList.toggle('checked');
+  el.setAttribute('aria-checked', isChecked ? 'true' : 'false');
+  if (stepId) {
+    const s = loadState(); if (!s.steps) s.steps = {};
+    s.steps[stepId] = isChecked; saveState(s);
+  }
+  announce(isChecked ? 'Paso marcado como completado.' : 'Paso desmarcado.');
+}
+function stepKeydown(e, el) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleStep(el); }
+}
+function restoreSteps() {
+  const s = loadState(); if (!s.steps) return;
+  document.querySelectorAll('.step[data-step-id]').forEach(el => {
+    if (s.steps[el.dataset.stepId]) {
+      el.classList.add('checked'); el.setAttribute('aria-checked', 'true');
+    }
+  });
 }
 
 // OPTIONS
 function selectOption(btn, isCorrect, questionId) {
   const parent = btn.closest('.options');
-  parent.querySelectorAll('.option').forEach(o => o.classList.remove('selected','correct'));
+  parent.querySelectorAll('.option').forEach(o => { o.classList.remove('selected','correct'); o.removeAttribute('aria-pressed'); });
   btn.classList.add(isCorrect ? 'correct' : 'selected');
+  btn.setAttribute('aria-pressed', 'true');
   const reveal = document.getElementById(questionId + '-reveal');
   if (reveal) reveal.classList.add('show');
+  const optId = btn.dataset.optId;
+  if (optId) {
+    const s = loadState(); if (!s.answers) s.answers = {};
+    s.answers[questionId] = optId; saveState(s);
+  }
+  announce(isCorrect ? '¡Correcto! Explicación revelada.' : 'Respuesta seleccionada. Explicación revelada.');
+}
+function restoreAnswers() {
+  const s = loadState(); if (!s.answers) return;
+  Object.entries(s.answers).forEach(([qId, optId]) => {
+    const btn = document.querySelector(`[data-opt-id="${optId}"]`); if (!btn) return;
+    const isCorrect = btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('true');
+    btn.classList.add(isCorrect ? 'correct' : 'selected');
+    btn.setAttribute('aria-pressed', 'true');
+    const reveal = document.getElementById(qId + '-reveal');
+    if (reveal) reveal.classList.add('show');
+  });
 }
 
-// DAYS GRID
-const STORAGE_KEY = 'protocolo_days_v1';
-
+// DAYS
 function loadDays() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch { return []; }
+  const s = loadState();
+  if (!s.days) {
+    try {
+      const legacy = JSON.parse(localStorage.getItem('protocolo_days_v1'));
+      if (Array.isArray(legacy) && legacy.length) { s.days = legacy; saveState(s); localStorage.removeItem('protocolo_days_v1'); }
+    } catch {}
+  }
+  return Array.isArray(s.days) ? s.days : [];
 }
-
-function saveDays(days) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(days)); } catch {}
-}
+function saveDays(days) { const s = loadState(); s.days = days; saveState(s); }
 
 function buildGrid() {
   const grid = document.getElementById('daysGrid');
   const marked = loadDays();
   grid.innerHTML = '';
   for (let i = 1; i <= 30; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'day-cell' + (i === 7 || i === 14 || i === 30 ? ' milestone' : '');
+    const isMilestone = (i === 7 || i === 14 || i === 30);
+    const cell = document.createElement('button');
+    cell.className = 'day-cell' + (isMilestone ? ' milestone' : '');
     if (marked.includes(i)) cell.classList.add('marked');
     cell.textContent = i;
+    cell.setAttribute('type', 'button');
+    cell.setAttribute('tabindex', '0');
+    cell.setAttribute('aria-label', `Día ${i}${isMilestone ? ' (hito)' : ''}${marked.includes(i) ? ', completado' : ''}`);
+    cell.setAttribute('aria-pressed', marked.includes(i) ? 'true' : 'false');
     cell.onclick = () => toggleDay(i);
     grid.appendChild(cell);
   }
   updateScore(marked);
 }
-
 function toggleDay(day) {
   let marked = loadDays();
-  if (marked.includes(day)) {
-    marked = marked.filter(d => d !== day);
-  } else {
-    marked.push(day);
-  }
-  saveDays(marked);
-  buildGrid();
+  if (marked.includes(day)) { marked = marked.filter(d => d !== day); announce(`Día ${day} desmarcado.`); }
+  else { marked.push(day); announce(`Día ${day} marcado como completado.`); }
+  saveDays(marked); buildGrid();
 }
-
 function resetDays() {
-  if (confirm('¿Reiniciar el calendario de 30 días?')) {
-    saveDays([]);
-    buildGrid();
-  }
+  if (confirm('¿Reiniciar el calendario de 30 días?')) { saveDays([]); buildGrid(); announce('Calendario reiniciado.'); }
 }
-
 function updateScore(marked) {
   const count = marked.length;
   document.getElementById('scoreNum').textContent = count;
-
   const texts = {
-    0: 'Empieza hoy. No mañana.',
-    1: 'El primer día es el más importante.',
+    0: 'Empieza hoy. No mañana.', 1: 'El primer día es el más importante.',
     7: 'Una semana. Los primeros hábitos se están instalando.',
     14: 'Catorce días. Los receptores están emergiendo.',
     30: 'Treinta días. Sistema recalibrado.'
   };
-
-  let text = 'Cada día suma. Sigue.';
-  if (count === 0) text = texts[0];
-  else if (count === 1) text = texts[1];
-  else if (count >= 30) text = texts[30];
-  else if (count >= 14) text = texts[14];
+  let text = 'Cada día cuenta. Sigue adelante.';
+  if (count === 0) text = texts[0]; else if (count === 1) text = texts[1];
+  else if (count >= 30) text = texts[30]; else if (count >= 14) text = texts[14];
   else if (count >= 7) text = texts[7];
-
   document.getElementById('scoreText').textContent = text;
-
-  ['milestone7','milestone14','milestone30'].forEach(id => {
-    document.getElementById(id).classList.remove('show');
-  });
-  if (marked.includes(7)) document.getElementById('milestone7').classList.add('show');
+  ['milestone7','milestone14','milestone30'].forEach(id => document.getElementById(id).classList.remove('show'));
+  if (marked.includes(7))  document.getElementById('milestone7').classList.add('show');
   if (marked.includes(14)) document.getElementById('milestone14').classList.add('show');
   if (marked.includes(30)) document.getElementById('milestone30').classList.add('show');
 }
 
-buildGrid();
+// SPEECH (Spanish voice)
+const synth = window.speechSynthesis;
+let currentReadBtn = null;
+
+function extractSectionText(sectionId) {
+  const el = document.getElementById(sectionId); if (!el) return '';
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll('.section-read-btn, [aria-hidden="true"]').forEach(n => n.remove());
+  return clone.innerText.replace(/\s+/g, ' ').trim();
+}
+function stopSpeech() {
+  synth.cancel();
+  document.querySelectorAll('.section-read-btn').forEach(b => b.classList.remove('speaking'));
+  document.getElementById('globalStopBtn').style.display = 'none';
+  if (currentReadBtn) { currentReadBtn.classList.remove('speaking'); currentReadBtn = null; }
+  announce('Lectura detenida.');
+}
+function readSection(sectionId) {
+  if (!synth) { announce('La síntesis de voz no está disponible en este navegador.'); return; }
+  const section = document.getElementById(sectionId);
+  const btn = section ? section.querySelector('.section-read-btn') : null;
+  if (btn && btn.classList.contains('speaking')) { stopSpeech(); return; }
+  stopSpeech();
+  const text = extractSectionText(sectionId); if (!text) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'es-ES';
+  utter.rate = 0.9;
+  utter.pitch = 1;
+  // Prefer a Spanish voice if available
+  const voices = synth.getVoices();
+  const esVoice = voices.find(v => v.lang.startsWith('es'));
+  if (esVoice) utter.voice = esVoice;
+  utter.onstart = () => {
+    if (btn) { btn.classList.add('speaking'); currentReadBtn = btn; }
+    document.getElementById('globalStopBtn').style.display = 'inline-flex';
+    announce('Leyendo en voz alta. Pulsa de nuevo Escuchar o Parar para detener.');
+  };
+  utter.onend = utter.onerror = () => {
+    if (btn) btn.classList.remove('speaking');
+    document.getElementById('globalStopBtn').style.display = 'none';
+    currentReadBtn = null;
+  };
+  synth.speak(utter);
+}
+
+// INIT
+document.addEventListener('DOMContentLoaded', () => {
+  buildGrid(); restoreSteps(); restoreAnswers();
+  if (!window.speechSynthesis) {
+    document.querySelectorAll('.section-read-btn').forEach(b => b.style.display = 'none');
+  }
+});
 </script>
-<!-- PIE DE COPYRIGHT VISIBLE -->
-<div style="text-align: center; padding: 2rem 1rem; font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem;">
-  © 2026 Jose Ranero García · 
-  <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" style="color: var(--muted); text-decoration: none;">CC BY 4.0</a> · 
-  DOI: <a href="https://doi.org/10.5281/zenodo.19554967" style="color: var(--muted); text-decoration: none;">10.5281/zenodo.19554967</a>
-</div>
-  
 </body>
 </html>
