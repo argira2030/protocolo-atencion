@@ -7,20 +7,20 @@
 
 <!--
   ==================================================
-  PROTOCOLO DE ATENCIÓN - v2.0 (ESPAÑOL)
+  PROTOCOLO DE ATENCIÓN - v3.0 (ESPAÑOL)
   ==================================================
   Autor: Jose Ranero García
   ORCID: 0009-0009-3168-6379
   Copyright: © 2026 Jose Ranero García
   Licencia: CC BY 4.0
-  DOI: 10.5281/zenodo.19556754
+  DOI: 10.5281/zenodo.19558671
   Web: https://argira.eus/protocolo-atencion/
   ==================================================
 -->
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
 <style>
-/* ========== ESTILOS COMPLETOS (========= */
+/* ========== MISMO CSS QUE EN LA VERSIÓN INGLESA (sin cambios) ========== */
 :root {
   --bg: #f5f0e8;
   --bg2: #ede8de;
@@ -82,6 +82,11 @@ nav {
   color: var(--muted);
   text-transform: uppercase;
 }
+.nav-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
 .nav-steps {
   display: flex;
   gap: 0.5rem;
@@ -97,6 +102,17 @@ nav {
 }
 .nav-dot.active { background: var(--accent); transform: scale(1.4); }
 .nav-dot.done { background: var(--accent2); }
+.btn-stop-speech {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  padding: 0.2rem 0.8rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  font-family: monospace;
+  display: none;
+}
+.btn-stop-speech.visible { display: inline-block; }
 section {
   min-height: 100vh;
   display: flex;
@@ -117,6 +133,20 @@ section:nth-child(even) { background: var(--bg2); }
   opacity: 1;
   transform: translateY(0);
 }
+.btn-listen {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  font-family: monospace;
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.btn-listen:hover { background: var(--accent2); color: white; border-color: var(--accent2); }
 .hero-tag {
   font-family: 'DM Mono', monospace;
   font-size: 0.6rem;
@@ -461,7 +491,6 @@ h2 em { font-style: italic; color: var(--accent); }
   background: var(--border);
   margin: 2rem 0;
 }
-/* Estilos para autoevaluación (sin canvas) */
 .progress-bar-simple {
   background: var(--border);
   border-radius: 4px;
@@ -499,9 +528,10 @@ h2 em { font-style: italic; color: var(--accent); }
 
 <nav>
   <div class="nav-logo">Protocolo de Intervención Digital</div>
-  <div style="display: flex; gap: 1rem; align-items: center;">
+  <div class="nav-controls">
     <a href="https://argira.eus/attention_protocol/" style="font-family: monospace; font-size: 0.7rem; color: var(--ink2); text-decoration: none;">🇬🇧 English</a>
     <a href="https://argira.eus/Facil/" style="font-family: monospace; font-size: 0.7rem; color: var(--ink2); text-decoration: none;">📖 Lectura Fácil</a>
+    <button id="globalStopSpeechBtn" class="btn-stop-speech">⏹️ Parar</button>
     <div class="nav-steps">
       <div class="nav-dot active" onclick="scrollToSection(0)" title="Inicio"></div>
       <div class="nav-dot" onclick="scrollToSection(1)" title="Fase 1"></div>
@@ -525,6 +555,34 @@ h2 em { font-style: italic; color: var(--accent); }
       <span class="label">R = Recuperación de atención · F = Fricción añadida · C = Conciencia del mecanismo · E = Estímulos de bajo valor · V = Velocidad de exposición</span>
     </div>
     <a href="#s1" class="btn">Iniciar protocolo →</a>
+    
+    <!-- AUTOEVALUACIÓN (justo después del botón Iniciar protocolo) -->
+    <div class="self-assessment" id="selfAssessment" style="margin-top: 2rem;">
+      <button class="btn btn-ghost" id="openAssessmentBtn">📊 Evaluar mi autonomía</button>
+      <div id="assessmentModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1000; overflow: auto; padding: 2rem;">
+        <div style="max-width: 600px; margin: 2rem auto; background: var(--white); padding: 2rem; border-radius: 12px;">
+          <h3 style="font-family: 'DM Serif Display', serif;">Autoevaluación: Tu autonomía atencional</h3>
+          <p>Responde con honestidad (1 = totalmente en desacuerdo, 5 = totalmente de acuerdo). Guarda los resultados antes de empezar y después de 14+ días para ver tu progreso.</p>
+          <form id="assessmentForm">
+            <div id="questionsContainer"></div>
+            <div style="margin: 1.5rem 0;">
+              <label><input type="radio" name="assessmentType" value="pre" checked> Antes del protocolo (pre)</label><br>
+              <label><input type="radio" name="assessmentType" value="post"> Después del protocolo (post)</label>
+            </div>
+            <button type="submit" class="btn" style="margin-right: 1rem;">Guardar evaluación</button>
+            <button type="button" id="closeAssessmentBtn" class="btn-ghost">Cancelar</button>
+          </form>
+          <div id="assessmentResults" style="margin-top: 2rem; display: none;">
+            <h4>Tu progreso</h4>
+            <div id="resultsText"></div>
+            <button id="exportResultsBtn" class="btn-ghost" style="margin-top: 1rem;">📁 Exportar resultados (JSON)</button>
+            <button id="clearResultsBtn" class="btn-ghost" style="margin-top: 1rem; margin-left: 0.5rem;">🗑️ Borrar todos los resultados</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Fin autoevaluación -->
+    
   </div>
 </section>
 
@@ -534,17 +592,21 @@ h2 em { font-style: italic; color: var(--accent); }
     <div class="phase-num">Fase 01 de 04</div>
     <h2>Intervención en<br>el <em>Entorno</em></h2>
     <p class="phase-intro">El sistema digital está diseñado para que tu voluntad llegue tarde. La solución no es más fuerza de voluntad — es añadir fricción donde el diseño busca fluidez.</p>
+    <button class="btn-listen" data-section="s1">🔊 Escuchar esta fase</button>
     <div class="science">
       <p>El cerebro humano tiene un <strong>sistema de atención involuntaria</strong> (red saliente) que responde automáticamente a estímulos brillantes, móviles y sonoros antes de que la conciencia pueda vetarlos. Las notificaciones y los colores saturados explotan exactamente este sistema. Añadir fricción — pasos extra, grises, silencio — da tiempo al <strong>lóbulo prefrontal</strong> para recuperar el control.</p>
     </div>
     <div class="steps" id="steps1">
-      <div class="step" data-step-id="1.1" onclick="toggleStep(this)">
-        <div class="step-check">✓</div>
-        <div class="step-content">
-          <h4>Escala de Grises</h4>
-          <p>Configura la pantalla en blanco y negro. Elimina el valor predictivo de los colores brillantes que activan la dopamina fásica. El sistema se vuelve visualmente inerte. <em>iOS: Ajustes → Accesibilidad → Tamaño y texto → Filtros de color.</em></p>
-        </div>
-      </div>
+   <div class="step" data-step-id="1.1" onclick="toggleStep(this)">
+  <div class="step-check">✓</div>
+  <div class="step-content">
+    <h4>Reduce los colores brillantes de la pantalla</h4>
+    <p>Los colores brillantes llaman tu atención. Prueba estas opciones (elige una):<br>
+    - Baja el brillo de la pantalla.<br>
+    - Activa el "modo noche" o "modo lectura".<br>
+    - <strong>Avanzado:</strong> Si sabes cómo, activa el blanco y negro (Ajustes → Accesibilidad → Pantalla → Filtros de color).</p>
+  </div>
+</div>
       <div class="step" data-step-id="1.2" onclick="toggleStep(this)">
         <div class="step-check">✓</div>
         <div class="step-content">
@@ -579,6 +641,7 @@ h2 em { font-style: italic; color: var(--accent); }
     <div class="phase-num">Fase 02 de 04</div>
     <h2>Estabilización<br><em>Biológica</em></h2>
     <p class="phase-intro">Cuando el sistema está saturado, los receptores de dopamina se "ocultan" para protegerse de la sobreestimulación. Para recuperarlos, necesitas reducir el ruido — no añadir más señal.</p>
+    <button class="btn-listen" data-section="s2">🔊 Escuchar esta fase</button>
     <div class="science">
       <p>La <strong>downregulation dopaminérgica</strong> ocurre cuando los receptores D2 reducen su densidad en respuesta a la sobreestimulación crónica. El cerebro no puede distinguir entre dopamina real (logro, conexión) y dopamina artificial (scroll, likes). El resultado: necesitas más estímulo para sentir lo mismo. La solución es un <strong>ayuno de dopamina selectivo</strong> — no eliminar toda estimulación, sino eliminar la de bajo valor y alta frecuencia.</p>
     </div>
@@ -624,6 +687,7 @@ h2 em { font-style: italic; color: var(--accent); }
     <div class="phase-num">Fase 03 de 04</div>
     <h2>El Veto de<br><em>Conciencia</em></h2>
     <p class="phase-intro">No puedes parar el impulso. Pero puedes crear un espacio entre el impulso y la acción. Ese espacio es donde vive la libertad.</p>
+    <button class="btn-listen" data-section="s3">🔊 Escuchar esta fase</button>
     <div class="science">
       <p>Benjamin Libet demostró que el cerebro genera una señal de movimiento <strong>300-500ms antes</strong> de que seamos conscientes de querer movernos. Pero también encontró algo crítico: existe una <strong>ventana de veto consciente</strong> en los últimos 200ms. No puedes evitar que el impulso aparezca. Sí puedes vetarlo. El Protocolo de los 5 Segundos es exactamente esa ventana ampliada.</p>
     </div>
@@ -670,6 +734,7 @@ h2 em { font-style: italic; color: var(--accent); }
     <div class="phase-num">Fase 04 de 04</div>
     <h2>Sustitución<br>de la <em>Métrica</em></h2>
     <p class="phase-intro">El móvil como entorno de habitación — un lugar donde "estar" — es el diseño que más daño hace. La solución es convertirlo en herramienta de ejecución: entra con una tarea, sal cuando está completada.</p>
+    <button class="btn-listen" data-section="s4">🔊 Escuchar esta fase</button>
     <div class="science">
       <p>El cerebro opera con <strong>sistemas de recompensa orientados a objetivos</strong> (goal-directed) y sistemas de <strong>hábito</strong> (habit-based). Las plataformas digitales están diseñadas para mover el comportamiento del primer sistema al segundo — de la elección al automatismo. Definir una tarea antes de entrar activa el sistema goal-directed y lo mantiene en control durante la sesión, previniendo que el hábito tome el mando.</p>
     </div>
@@ -715,6 +780,7 @@ h2 em { font-style: italic; color: var(--accent); }
     <div class="phase-num">La Fórmula</div>
     <h2>R = (F × C)<br><em>− (E × V)</em></h2>
     <p class="phase-intro">Cada acción del protocolo actúa sobre una variable de esta ecuación. No es metáfora — es la estructura real del problema y su solución.</p>
+    <button class="btn-listen" data-section="s5">🔊 Escuchar esta sección</button>
     <div class="formula-block">
       <div class="formula-eq"><span class="var">R</span> <span class="op">=</span> <span>(</span><span class="var">F</span> <span class="op">×</span> <span class="var">C</span><span>)</span> <span class="op">−</span> <span>(</span><span class="var">E</span> <span class="op">×</span> <span class="var">V</span><span>)</span></div>
       <div class="formula-vars">
@@ -738,12 +804,13 @@ h2 em { font-style: italic; color: var(--accent); }
   </div>
 </section>
 
-<!-- ========== CALENDARIO + AUTOEVALUACIÓN ========== -->
+<!-- ========== CALENDARIO ========== -->
 <section id="s6">
   <div class="section-inner">
     <div class="phase-num">El Calendario</div>
     <h2>30 días para<br>recalibrar el <em>sistema.</em></h2>
     <p class="phase-intro">El cerebro necesita entre 14 y 30 días de reducción de estímulos para que los receptores de dopamina regresen a sus niveles basales. Marca cada día. La sensación de vacío inicial es la señal de que funciona.</p>
+    <button class="btn-listen" data-section="s6">🔊 Escuchar esta sección</button>
 
     <div class="days-tracker">
       <div class="days-label">Marca cada día completado — Haz clic para registrar</div>
@@ -759,32 +826,6 @@ h2 em { font-style: italic; color: var(--accent); }
       <div class="score-text" id="scoreText">Empieza hoy. No mañana.</div>
     </div>
 
-    <!-- AUTOEVALUACIÓN (sin canvas) -->
-    <div class="self-assessment" id="selfAssessment">
-      <button class="btn btn-ghost" id="openAssessmentBtn" style="margin-top: 1rem;">📊 Evaluar mi autonomía</button>
-      <div id="assessmentModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1000; overflow: auto; padding: 2rem;">
-        <div style="max-width: 600px; margin: 2rem auto; background: var(--white); padding: 2rem; border-radius: 12px;">
-          <h3 style="font-family: 'DM Serif Display', serif;">Autoevaluación: Tu autonomía atencional</h3>
-          <p>Responde con honestidad (1 = totalmente en desacuerdo, 5 = totalmente de acuerdo). Guarda los resultados antes de empezar y después de 14+ días para ver tu progreso.</p>
-          <form id="assessmentForm">
-            <div id="questionsContainer"></div>
-            <div style="margin: 1.5rem 0;">
-              <label><input type="radio" name="assessmentType" value="pre" checked> Antes del protocolo (pre)</label><br>
-              <label><input type="radio" name="assessmentType" value="post"> Después del protocolo (post)</label>
-            </div>
-            <button type="submit" class="btn" style="margin-right: 1rem;">Guardar evaluación</button>
-            <button type="button" id="closeAssessmentBtn" class="btn-ghost">Cancelar</button>
-          </form>
-          <div id="assessmentResults" style="margin-top: 2rem; display: none;">
-            <h4>Tu progreso</h4>
-            <div id="resultsText"></div>
-            <button id="exportResultsBtn" class="btn-ghost" style="margin-top: 1rem;">📁 Exportar resultados (JSON)</button>
-            <button id="clearResultsBtn" class="btn-ghost" style="margin-top: 1rem; margin-left: 0.5rem;">🗑️ Borrar todos los resultados</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="divider"></div>
     <div class="quote"><p>"No se trata de usar menos tecnología. Se trata de que la uses tú a ella — y no ella a ti."</p></div>
     <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:2rem;">
@@ -792,13 +833,13 @@ h2 em { font-style: italic; color: var(--accent); }
       <a href="#s0" class="btn">Volver al inicio ↑</a>
     </div>
     <div style="text-align: center; padding: 2rem 1rem 1rem; font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem;">
-      © 2026 Jose Ranero García · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" style="color: var(--muted); text-decoration: none;">CC BY 4.0</a> · DOI: <a href="https://doi.org/10.5281/zenodo.19556754" style="color: var(--muted); text-decoration: none;">10.5281/zenodo.19556754</a> · ORCID: 0009-0009-3168-6379
+      © 2026 Jose Ranero García · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" style="color: var(--muted); text-decoration: none;">CC BY 4.0</a> · DOI v3.0: <a href="https://doi.org/10.5281/zenodo.19558671" style="color: var(--muted); text-decoration: none;">10.5281/zenodo.19558671</a> · ORCID: 0009-0009-3168-6379
     </div>
   </div>
 </section>
 
 <script>
-// ========== PROGRESS BAR ==========
+// ========== PROGRESS BAR (throttled) ==========
 let ticking = false;
 window.addEventListener('scroll', () => {
   if (!ticking) {
@@ -839,7 +880,7 @@ function updateNav(activeIdx) {
   });
 }
 
-// ========== PASOS (persistencia) ==========
+// ========== STEPS (persistence) ==========
 function toggleStep(stepElement) {
   stepElement.classList.toggle('checked');
   saveSteps();
@@ -849,10 +890,10 @@ function saveSteps() {
   document.querySelectorAll('.step').forEach(step => {
     stepsState.push(step.classList.contains('checked'));
   });
-  localStorage.setItem('protocolo_steps_v2', JSON.stringify(stepsState));
+  localStorage.setItem('protocolo_steps_v2_es', JSON.stringify(stepsState));
 }
 function loadSteps() {
-  const saved = localStorage.getItem('protocolo_steps_v2');
+  const saved = localStorage.getItem('protocolo_steps_v2_es');
   if (saved) {
     const stepsState = JSON.parse(saved);
     document.querySelectorAll('.step').forEach((step, idx) => {
@@ -861,24 +902,23 @@ function loadSteps() {
   }
 }
 
-// ========== PREGUN ==========
+// ========== QUESTIONS (persistence) ==========
 function selectOption(btn, isCorrect, questionId) {
   const parent = btn.closest('.options');
   parent.querySelectorAll('.option').forEach(o => o.classList.remove('selected','correct'));
   btn.classList.add(isCorrect ? 'correct' : 'selected');
   const reveal = document.getElementById(questionId + '-reveal');
   if (reveal) reveal.classList.add('show');
-  // Guardar respuesta seleccionada
   const selectedValue = Array.from(parent.querySelectorAll('.option')).indexOf(btn);
   saveAnswer(questionId, selectedValue);
 }
 function saveAnswer(questionId, selectedIndex) {
-  const answers = JSON.parse(localStorage.getItem('protocolo_answers_v2') || '{}');
+  const answers = JSON.parse(localStorage.getItem('protocolo_answers_v2_es') || '{}');
   answers[questionId] = selectedIndex;
-  localStorage.setItem('protocolo_answers_v2', JSON.stringify(answers));
+  localStorage.setItem('protocolo_answers_v2_es', JSON.stringify(answers));
 }
 function loadAnswers() {
-  const answers = JSON.parse(localStorage.getItem('protocolo_answers_v2') || '{}');
+  const answers = JSON.parse(localStorage.getItem('protocolo_answers_v2_es') || '{}');
   for (const [qId, idx] of Object.entries(answers)) {
     const questionDiv = document.getElementById(qId + '-reveal')?.closest('.question-block');
     if (questionDiv) {
@@ -891,8 +931,8 @@ function loadAnswers() {
   }
 }
 
-// ========== CALENDARIO ==========
-const STORAGE_KEY = 'protocolo_days_v2';
+// ========== CALENDAR ==========
+const STORAGE_KEY = 'protocolo_days_v2_es';
 function loadDays() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -946,8 +986,8 @@ function updateScore(marked) {
   if (marked.includes(30)) document.getElementById('milestone30').classList.add('show');
 }
 
-// ========== AUTOEVALUACIÓN (sin canvas) ==========
-const ASSESSMENT_KEY = 'protocolo_assessment_v2';
+// ========== SELF-ASSESSMENT (sin canvas, español) ==========
+const ASSESSMENT_KEY = 'protocolo_assessment_es_v2';
 const questions = [
   "Puedo dejar el móvil apartado una hora sin sentir ansiedad.",
   "Cuando abro una app, suelo tener una tarea clara en mente.",
@@ -1060,7 +1100,66 @@ document.getElementById('clearResultsBtn')?.addEventListener('click', () => {
   }
 });
 
-// ========== INICIALIZACIÓN ==========
+// ========== TEXT-TO-SPEECH (Web Speech API, español) ==========
+let currentUtterance = null;
+function stopSpeech() {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    currentUtterance = null;
+    const stopBtn = document.getElementById('globalStopSpeechBtn');
+    if (stopBtn) stopBtn.classList.remove('visible');
+  }
+}
+function speakText(text, lang = 'es-ES') {
+  if (!window.speechSynthesis) {
+    alert('Tu navegador no soporta síntesis de voz.');
+    return;
+  }
+  stopSpeech();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = lang;
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+  currentUtterance = utterance;
+  utterance.onend = () => {
+    currentUtterance = null;
+    const stopBtn = document.getElementById('globalStopSpeechBtn');
+    if (stopBtn) stopBtn.classList.remove('visible');
+  };
+  utterance.onerror = () => {
+    currentUtterance = null;
+    const stopBtn = document.getElementById('globalStopSpeechBtn');
+    if (stopBtn) stopBtn.classList.remove('visible');
+  };
+  window.speechSynthesis.speak(utterance);
+  const stopBtn = document.getElementById('globalStopSpeechBtn');
+  if (stopBtn) stopBtn.classList.add('visible');
+}
+function getSectionText(sectionId) {
+  const section = document.getElementById(sectionId);
+  if (!section) return '';
+  const clone = section.cloneNode(true);
+  const unwanted = clone.querySelectorAll('.btn-listen, .step, .option, .btn, .nav-dot, .progress-bar, .btn-stop-speech, .self-assessment');
+  unwanted.forEach(el => el.remove());
+  let text = clone.innerText || clone.textContent;
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
+}
+document.querySelectorAll('.btn-listen').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const sectionId = btn.getAttribute('data-section');
+    if (sectionId) {
+      const text = getSectionText(sectionId);
+      if (text) speakText(text);
+    }
+  });
+});
+document.getElementById('globalStopSpeechBtn')?.addEventListener('click', () => {
+  stopSpeech();
+});
+
+// ========== INITIALIZATION ==========
 loadSteps();
 loadAnswers();
 buildGrid();
